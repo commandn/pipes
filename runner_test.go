@@ -29,24 +29,24 @@ func Test_Runner_Register(t *testing.T) {
 func Test_Runner_Run_SuccessHandler(t *testing.T) {
 	t.Parallel()
 
-	const successHandlerId = 42
+	const handlerId = 42
 
-	successHandler := func(context.Context, Store) (any, error) {
+	handler := func(context.Context, Store) (any, error) {
 		return "foobar", nil
 	}
 
 	s := NewStore()
-	err := s.Register(successHandlerId)
+	err := s.Register(handlerId)
 	require.NoError(t, err)
 
 	r := NewRunner[Store]()
-	err = r.Register(successHandlerId, successHandler)
+	err = r.Register(handlerId, handler)
 	require.NoError(t, err)
 
 	err = r.Run(context.Background(), s)
 	require.NoError(t, err)
 
-	data, err := s.Read(context.Background(), successHandlerId)
+	data, err := s.Read(context.Background(), handlerId)
 	require.Equal(t, "foobar", data)
 	require.NoError(t, err)
 }
@@ -54,24 +54,24 @@ func Test_Runner_Run_SuccessHandler(t *testing.T) {
 func Test_Runner_Run_ErrorHandler(t *testing.T) {
 	t.Parallel()
 
-	const errorHandlerId = 43
+	const handlerId = 43
 
-	errorHandler := func(context.Context, Store) (any, error) {
+	handler := func(context.Context, Store) (any, error) {
 		return nil, fmt.Errorf("error in handler")
 	}
 
 	s := NewStore()
-	err := s.Register(errorHandlerId)
+	err := s.Register(handlerId)
 	require.NoError(t, err)
 
 	r := NewRunner[Store]()
-	err = r.Register(errorHandlerId, errorHandler)
+	err = r.Register(handlerId, handler)
 	require.NoError(t, err)
 
 	err = r.Run(context.Background(), s)
 	require.NoError(t, err)
 
-	data, err := s.Read(context.Background(), errorHandlerId)
+	data, err := s.Read(context.Background(), handlerId)
 	require.Nil(t, data)
 	require.ErrorContains(t, err, "error in handler")
 }
@@ -79,24 +79,24 @@ func Test_Runner_Run_ErrorHandler(t *testing.T) {
 func Test_Runner_Run_PanicHandler(t *testing.T) {
 	t.Parallel()
 
-	const panicHandlerId = 44
+	const handlerId = 44
 
-	panicHandler := func(context.Context, Store) (any, error) {
+	handler := func(context.Context, Store) (any, error) {
 		panic("panic in handler")
 	}
 
 	s := NewStore()
-	err := s.Register(panicHandlerId)
+	err := s.Register(handlerId)
 	require.NoError(t, err)
 
 	r := NewRunner[Store]()
-	err = r.Register(panicHandlerId, panicHandler)
+	err = r.Register(handlerId, handler)
 	require.NoError(t, err)
 
 	err = r.Run(context.Background(), s)
 	require.ErrorContains(t, err, "panic recover")
 
-	data, err := s.Read(context.Background(), panicHandlerId)
+	data, err := s.Read(context.Background(), handlerId)
 	require.Nil(t, data)
 	require.ErrorContains(t, err, "panic recover")
 }
@@ -104,9 +104,9 @@ func Test_Runner_Run_PanicHandler(t *testing.T) {
 func Test_Runner_Run_InfiniteHandler(t *testing.T) {
 	t.Parallel()
 
-	const infiniteHandlerId = 45
+	const handlerId = 45
 
-	infiniteHandler := func(ctx context.Context, _ Store) (any, error) {
+	handler := func(ctx context.Context, _ Store) (any, error) {
 		for {
 			select {
 			case <-ctx.Done():
@@ -118,17 +118,17 @@ func Test_Runner_Run_InfiniteHandler(t *testing.T) {
 	}
 
 	s := NewStore()
-	err := s.Register(infiniteHandlerId)
+	err := s.Register(handlerId)
 	require.NoError(t, err)
 
 	r := NewRunner[Store]()
-	err = r.Register(infiniteHandlerId, infiniteHandler, WithTimeout[Store](time.Second*3))
+	err = r.Register(handlerId, handler, WithTimeout[Store](time.Second*3))
 	require.NoError(t, err)
 
 	err = r.Run(context.Background(), s)
 	require.NoError(t, err)
 
-	data, err := s.Read(context.Background(), infiniteHandlerId)
+	data, err := s.Read(context.Background(), handlerId)
 	require.Nil(t, data)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 }
@@ -136,9 +136,9 @@ func Test_Runner_Run_InfiniteHandler(t *testing.T) {
 func Test_Runner_Run_SkipHandler(t *testing.T) {
 	t.Parallel()
 
-	const skipHandlerId = 46
+	const handlerId = 46
 
-	skipHandler := func(context.Context, Store) (any, error) {
+	handler := func(context.Context, Store) (any, error) {
 		return "foobar", nil
 	}
 
@@ -155,17 +155,17 @@ func Test_Runner_Run_SkipHandler(t *testing.T) {
 			t.Parallel()
 
 			s := NewStore()
-			err := s.Register(skipHandlerId)
+			err := s.Register(handlerId)
 			require.NoError(t, err)
 
 			r := NewRunner[Store]()
-			err = r.Register(skipHandlerId, skipHandler, WithCondition[Store](tc.skip))
+			err = r.Register(handlerId, handler, WithCondition[Store](tc.skip))
 			require.NoError(t, err)
 
 			err = r.Run(context.Background(), s)
 			require.NoError(t, err)
 
-			data, err := s.Read(context.Background(), skipHandlerId)
+			data, err := s.Read(context.Background(), handlerId)
 			if tc.skip {
 				require.Nil(t, data)
 				require.ErrorIs(t, err, ErrSkip)
@@ -180,35 +180,35 @@ func Test_Runner_Run_SkipHandler(t *testing.T) {
 func Test_Runner_Run_NoStateHandler(t *testing.T) {
 	t.Parallel()
 
-	const noStateHandlerId = 47
+	const handlerId = 47
 
-	noStateHandler := func(context.Context, Store) (any, error) {
+	handler := func(context.Context, Store) (any, error) {
 		return nil, nil
 	}
 
 	s := NewStore()
-	err := s.Register(noStateHandlerId)
+	err := s.Register(handlerId)
 	require.NoError(t, err)
 
 	r := NewRunner[Store]()
 
-	err = r.Register(noStateHandlerId, noStateHandler)
+	err = r.Register(handlerId, handler)
 	require.NoError(t, err)
 
 	err = r.Run(context.Background(), s)
 	require.NoError(t, err)
 
-	data, err := s.Read(context.Background(), noStateHandlerId)
+	data, err := s.Read(context.Background(), handlerId)
 	require.Nil(t, data)
 	require.NoError(t, err)
 }
 
-func Test_Runner_Run_CriticalPathHandler(t *testing.T) {
+func Test_Runner_Run_CriticalPathHandler_ErrorInHandler(t *testing.T) {
 	t.Parallel()
 
-	const criticalPathHandlerId = 48
+	const handlerId = 48
 
-	criticalPathHandler := func(context.Context, Store) (any, error) {
+	handler := func(context.Context, Store) (any, error) {
 		return nil, fmt.Errorf("error in handler on critical path")
 	}
 
@@ -225,7 +225,7 @@ func Test_Runner_Run_CriticalPathHandler(t *testing.T) {
 			t.Parallel()
 
 			s := NewStore()
-			err := s.Register(criticalPathHandlerId)
+			err := s.Register(handlerId)
 			require.NoError(t, err)
 
 			var opts []Option[Store]
@@ -234,23 +234,67 @@ func Test_Runner_Run_CriticalPathHandler(t *testing.T) {
 			}
 
 			r := NewRunner[Store]()
-			err = r.Register(criticalPathHandlerId, criticalPathHandler, opts...)
+			err = r.Register(handlerId, handler, opts...)
 			require.NoError(t, err)
 
 			err = r.Run(context.Background(), s)
 			if tc.withCriticalPath {
 				require.ErrorIs(t, err, ErrCriticalPath)
 
-				data, err := s.Read(context.Background(), criticalPathHandlerId)
+				data, err := s.Read(context.Background(), handlerId)
 				require.Nil(t, data)
 				require.ErrorIs(t, err, ErrCriticalPath)
 			} else {
 				require.NoError(t, err)
 
-				data, err := s.Read(context.Background(), criticalPathHandlerId)
+				data, err := s.Read(context.Background(), handlerId)
 				require.Nil(t, data)
 				require.NotErrorIs(t, err, ErrCriticalPath)
 			}
+		})
+	}
+}
+
+func Test_Runner_Run_CriticalPathHandler_NoErrorInHandler(t *testing.T) {
+	t.Parallel()
+
+	const handlerId = 48
+
+	handler := func(context.Context, Store) (any, error) {
+		return "foobar", nil
+	}
+
+	tcs := []struct {
+		name             string
+		withCriticalPath bool
+	}{
+		{"with critical path", true},
+		{"without critical path", false},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			s := NewStore()
+			err := s.Register(handlerId)
+			require.NoError(t, err)
+
+			var opts []Option[Store]
+			if tc.withCriticalPath {
+				opts = append(opts, WithCriticalPath[Store]())
+			}
+
+			r := NewRunner[Store]()
+			err = r.Register(handlerId, handler, opts...)
+			require.NoError(t, err)
+
+			err = r.Run(context.Background(), s)
+			require.NoError(t, err)
+
+			data, err := s.Read(context.Background(), handlerId)
+			require.Equal(t, "foobar", data)
+			require.NoError(t, err)
 		})
 	}
 }
