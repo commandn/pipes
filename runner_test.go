@@ -254,3 +254,42 @@ func Test_Runner_Run_CriticalPathHandler(t *testing.T) {
 		})
 	}
 }
+
+func Test_wrap(t *testing.T) {
+	t.Parallel()
+
+	var result []int
+
+	const handlerId = 49
+
+	handler := func(context.Context, Store) (any, error) {
+		result = append(result, 0)
+		return nil, nil
+	}
+
+	option := func(value int) Option[Store] {
+		return func(next Handler[Store]) Handler[Store] {
+			return func(ctx context.Context, s Store) (any, error) {
+				result = append(result, value)
+				return next(ctx, s)
+			}
+		}
+	}
+
+	s := NewStore()
+	err := s.Register(handlerId)
+	require.NoError(t, err)
+
+	r := NewRunner[Store]()
+	err = r.Register(handlerId, handler, option(3), option(2), option(1))
+	require.NoError(t, err)
+
+	err = r.Run(context.Background(), s)
+	require.NoError(t, err)
+
+	data, err := s.Read(context.Background(), handlerId)
+	require.Nil(t, data)
+	require.NoError(t, err)
+
+	require.Equal(t, []int{3, 2, 1, 0}, result)
+}
