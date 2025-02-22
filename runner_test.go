@@ -204,20 +204,45 @@ func Test_Runner_Run_CriticalPathHandler(t *testing.T) {
 		return nil, fmt.Errorf("error in handler on critical path")
 	}
 
-	s := NewStore()
-	err := s.Register(criticalPathHandlerId)
-	require.NoError(t, err)
+	tcs := []struct {
+		name             string
+		withCriticalPath bool
+	}{
+		{"with critical path", true},
+		{"without critical path", false},
+	}
 
-	r := NewRunner[Store]()
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	// TODO: add table test to another handler result (not failed)
-	err = r.Register(criticalPathHandlerId, criticalPathHandler, WithCriticalPath[Store]())
-	require.NoError(t, err)
+			s := NewStore()
+			err := s.Register(criticalPathHandlerId)
+			require.NoError(t, err)
 
-	err = r.Run(context.Background(), s)
-	require.ErrorIs(t, err, ErrCriticalPath)
+			var opts []Option[Store]
+			if tc.withCriticalPath {
+				opts = append(opts, WithCriticalPath[Store]())
+			}
 
-	data, err := s.Read(context.Background(), criticalPathHandlerId)
-	require.Nil(t, data)
-	require.ErrorIs(t, err, ErrCriticalPath)
+			r := NewRunner[Store]()
+			err = r.Register(criticalPathHandlerId, criticalPathHandler, opts...)
+			require.NoError(t, err)
+
+			err = r.Run(context.Background(), s)
+			if tc.withCriticalPath {
+				require.ErrorIs(t, err, ErrCriticalPath)
+
+				data, err := s.Read(context.Background(), criticalPathHandlerId)
+				require.Nil(t, data)
+				require.ErrorIs(t, err, ErrCriticalPath)
+			} else {
+				require.NoError(t, err)
+
+				data, err := s.Read(context.Background(), criticalPathHandlerId)
+				require.Nil(t, data)
+				require.NotErrorIs(t, err, ErrCriticalPath)
+			}
+		})
+	}
 }
