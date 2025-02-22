@@ -40,11 +40,14 @@ func Test_Runner_Run_SuccessHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	r := NewRunner[Store]()
-
 	err = r.Register(successHandlerId, successHandler)
 	require.NoError(t, err)
 
 	err = r.Run(context.Background(), s)
+	require.NoError(t, err)
+
+	data, err := s.Read(context.Background(), successHandlerId)
+	require.Equal(t, "foobar", data)
 	require.NoError(t, err)
 }
 
@@ -62,12 +65,15 @@ func Test_Runner_Run_ErrorHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	r := NewRunner[Store]()
-
 	err = r.Register(errorHandlerId, errorHandler)
 	require.NoError(t, err)
 
 	err = r.Run(context.Background(), s)
 	require.NoError(t, err)
+
+	data, err := s.Read(context.Background(), errorHandlerId)
+	require.Nil(t, data)
+	require.ErrorContains(t, err, "error in handler")
 }
 
 func Test_Runner_Run_PanicHandler(t *testing.T) {
@@ -84,11 +90,14 @@ func Test_Runner_Run_PanicHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	r := NewRunner[Store]()
-
 	err = r.Register(panicHandlerId, panicHandler)
 	require.NoError(t, err)
 
 	err = r.Run(context.Background(), s)
+	require.ErrorContains(t, err, "panic recover")
+
+	data, err := s.Read(context.Background(), panicHandlerId)
+	require.Nil(t, data)
 	require.ErrorContains(t, err, "panic recover")
 }
 
@@ -113,7 +122,6 @@ func Test_Runner_Run_InfiniteHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	r := NewRunner[Store]()
-
 	err = r.Register(infiniteHandlerId, infiniteHandler, WithTimeout[Store](time.Second*3))
 	require.NoError(t, err)
 
