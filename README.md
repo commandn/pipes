@@ -1,3 +1,3 @@
 ## pipes
 
-`pipes` is an `errgroup.Group` wrapper with store to handle topological tasks.
+`pipes` is a wrapper for `errgroup.Group` with a store to handle topological tasks.
