@@ -134,22 +134,39 @@ func Test_Runner_Run_SkipHandler(t *testing.T) {
 		return "foobar", nil
 	}
 
-	s := NewStore()
-	err := s.Register(skipHandlerId)
-	require.NoError(t, err)
+	tcs := []struct {
+		name string
+		skip bool
+	}{
+		{"skip handler", true},
+		{"do not skip handler", false},
+	}
 
-	r := NewRunner[Store]()
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	// TODO: add table test to another skip state
-	err = r.Register(skipHandlerId, skipHandler, WithCondition[Store](true))
-	require.NoError(t, err)
+			s := NewStore()
+			err := s.Register(skipHandlerId)
+			require.NoError(t, err)
 
-	err = r.Run(context.Background(), s)
-	require.NoError(t, err)
+			r := NewRunner[Store]()
+			err = r.Register(skipHandlerId, skipHandler, WithCondition[Store](tc.skip))
+			require.NoError(t, err)
 
-	data, err := s.Read(context.Background(), skipHandlerId)
-	require.Nil(t, data)
-	require.ErrorIs(t, err, ErrSkip)
+			err = r.Run(context.Background(), s)
+			require.NoError(t, err)
+
+			data, err := s.Read(context.Background(), skipHandlerId)
+			if tc.skip {
+				require.Nil(t, data)
+				require.ErrorIs(t, err, ErrSkip)
+			} else {
+				require.NotNil(t, data)
+				require.NoError(t, err)
+			}
+		})
+	}
 }
 
 func Test_Runner_Run_NoStateHandler(t *testing.T) {
