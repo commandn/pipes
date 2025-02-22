@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"golang.org/x/sync/errgroup"
+	"maps"
+	"sync"
+	"time"
 )
 
 var ErrHandlerAlreadyRegistered = errors.New("handler already registered")
@@ -15,11 +18,15 @@ type Handler[S Store] func(context.Context, S) (any, error)
 // It would be much more cleaner to implement typed runner without generics
 type Runner[S Store] struct {
 	handlers map[int]Handler[S]
+
+	statistics   map[int]time.Duration
+	statisticsMu sync.Mutex
 }
 
 func NewRunner[S Store]() *Runner[S] {
 	return &Runner[S]{
-		make(map[int]Handler[S]),
+		handlers:   make(map[int]Handler[S]),
+		statistics: make(map[int]time.Duration),
 	}
 }
 
@@ -38,6 +45,12 @@ func (r *Runner[S]) Run(ctx context.Context, s S) error {
 
 	for id, handler := range r.handlers {
 		eg.Go(func() (err error) {
+			defer func(from time.Time) {
+				r.statisticsMu.Lock()
+				defer r.statisticsMu.Unlock()
+				r.statistics[id] = time.Since(from)
+			}(time.Now())
+
 			defer func() {
 				if recErr := recover(); recErr != nil {
 					err = errors.Join(err, fmt.Errorf("panic recover: %v", recErr))
@@ -54,12 +67,19 @@ func (r *Runner[S]) Run(ctx context.Context, s S) error {
 				cancelFn(e)
 				err = errors.Join(err, e)
 			}
+
 			err = errors.Join(err, s.Write(id, d, e))
 			return err
 		})
 	}
 
 	return eg.Wait()
+}
+
+func (r *Runner[S]) Statistics() map[int]time.Duration {
+	r.statisticsMu.Lock()
+	defer r.statisticsMu.Unlock()
+	return maps.Clone(r.statistics)
 }
 
 func wrap[S Store](h Handler[S], opts []Option[S]) Handler[S] {

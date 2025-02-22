@@ -299,6 +299,50 @@ func Test_Runner_Run_CriticalPathHandler_NoErrorInHandler(t *testing.T) {
 	}
 }
 
+func Test_Runner_Statistics(t *testing.T) {
+	t.Parallel()
+
+	const (
+		handlerId1 = 1
+		handlerId2 = 2
+		handlerId3 = 3
+	)
+
+	handler := func(delay time.Duration) Handler[Store] {
+		return func(context.Context, Store) (any, error) {
+			time.Sleep(delay)
+			return nil, nil
+		}
+	}
+
+	s := NewStore()
+	err := s.Register(handlerId1)
+	require.NoError(t, err)
+	err = s.Register(handlerId2)
+	require.NoError(t, err)
+	err = s.Register(handlerId3)
+	require.NoError(t, err)
+
+	r := NewRunner[Store]()
+	err = r.Register(handlerId1, handler(time.Second))
+	require.NoError(t, err)
+	err = r.Register(handlerId2, handler(time.Second*2))
+	require.NoError(t, err)
+	err = r.Register(handlerId3, handler(time.Second*3))
+	require.NoError(t, err)
+
+	err = r.Run(context.Background(), s)
+	require.NoError(t, err)
+
+	statistics := r.Statistics()
+	require.Contains(t, statistics, handlerId1)
+	require.GreaterOrEqual(t, statistics[handlerId1], time.Second)
+	require.Contains(t, statistics, handlerId2)
+	require.GreaterOrEqual(t, statistics[handlerId2], time.Second*2)
+	require.Contains(t, statistics, handlerId3)
+	require.GreaterOrEqual(t, statistics[handlerId3], time.Second*3)
+}
+
 func Test_wrap(t *testing.T) {
 	t.Parallel()
 
