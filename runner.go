@@ -56,7 +56,6 @@ func (r *Runner[S]) Run(ctx context.Context, s S) error {
 					err = errors.Join(err, fmt.Errorf("panic recover: %v", recErr))
 					// TODO: What if r.s.Write() panics again?
 					// TODO: We must write state to unblock dependant consumers
-					// TODO: What if handler has no state to store?
 					wErr := s.Write(id, nil, err)
 					err = errors.Join(err, wErr)
 				}
