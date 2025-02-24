@@ -7,6 +7,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"maps"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -43,6 +44,8 @@ func (r *Runner[S]) Run(ctx context.Context, s S) error {
 	ctx, cancelFn := context.WithCancelCause(ctx)
 	defer cancelFn(nil)
 
+	var failover atomic.Bool
+
 	for id, handler := range r.handlers {
 		eg.Go(func() (err error) {
 			defer func(from time.Time) {
@@ -63,7 +66,9 @@ func (r *Runner[S]) Run(ctx context.Context, s S) error {
 
 			d, e := handler(ctx, s)
 			if errors.Is(e, ErrCriticalPath) {
-				cancelFn(e)
+				if failover.CompareAndSwap(false, true) {
+					cancelFn(e)
+				}
 				err = errors.Join(err, e)
 			}
 
