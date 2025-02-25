@@ -44,7 +44,7 @@ func (r *Runner[S]) Run(ctx context.Context, s S) error {
 	ctx, cancelFn := context.WithCancelCause(ctx)
 	defer cancelFn(nil)
 
-	var failover atomic.Bool
+	var killSwitch atomic.Bool
 
 	for id, handler := range r.handlers {
 		eg.Go(func() (err error) {
@@ -66,7 +66,7 @@ func (r *Runner[S]) Run(ctx context.Context, s S) error {
 
 			d, e := handler(ctx, s)
 			if errors.Is(e, ErrCriticalPath) {
-				if failover.CompareAndSwap(false, true) {
+				if killSwitch.CompareAndSwap(false, true) {
 					cancelFn(e)
 				}
 				err = errors.Join(err, e)
