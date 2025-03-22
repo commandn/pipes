@@ -45,3 +45,14 @@ func WithCriticalPath[S Store]() Option[S] {
 		}
 	}
 }
+
+func WithRunAfter[S Store](handlerIds ...int) Option[S] {
+	return func(next Handler[S]) Handler[S] {
+		return func(ctx context.Context, s S) (any, error) {
+			for i := 0; i < len(handlerIds); i++ {
+				_, _ = s.Read(ctx, handlerIds[i])
+			}
+			return next(ctx, s)
+		}
+	}
+}

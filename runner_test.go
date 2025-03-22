@@ -2,6 +2,7 @@ package pipes
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -297,6 +298,42 @@ func Test_Runner_Run_CriticalPathHandler_NoErrorInHandler(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func Test_Runner_Run_WithRunAfter(t *testing.T) {
+	t.Parallel()
+
+	const handlerId1 = 45
+	const handlerId2 = 46
+	const handlerId3 = 47
+
+	handler := func(d time.Duration) Handler[Store] {
+		return func(context.Context, Store) (any, error) {
+			time.Sleep(d)
+			return nil, nil
+		}
+	}
+
+	s := NewStore()
+	err := errors.Join(
+		s.Register(handlerId1),
+		s.Register(handlerId2),
+		s.Register(handlerId3),
+	)
+	require.NoError(t, err)
+
+	r := NewRunner[Store]()
+	err = errors.Join(
+		r.Register(handlerId1, handler(time.Millisecond*100)),
+		r.Register(handlerId2, handler(time.Millisecond*200), WithRunAfter[Store](handlerId1)),
+		r.Register(handlerId3, handler(time.Millisecond*300), WithRunAfter[Store](handlerId2)),
+	)
+	require.NoError(t, err)
+
+	start := time.Now()
+	err = r.Run(context.Background(), s)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, time.Since(start), time.Millisecond*600)
 }
 
 func Test_Runner_Statistics(t *testing.T) {
