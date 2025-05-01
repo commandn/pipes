@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/foobarbazmeow/pipes"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
+
+	"github.com/foobarbazmeow/pipes"
 )
 
 const (
@@ -104,12 +105,13 @@ func notifyHandler(ctx context.Context, store typedStore) (any, error) {
 func main() {
 	store := newStore(pipes.NewStore())
 	runner := pipes.NewRunner[typedStore]()
+	register := createRegistry(store, runner)
 
-	var err error
-	err = errors.Join(err, registerHandler(store, runner, fetchHandlerId, fetchHandler("https://google.com")))
-	err = errors.Join(err, registerHandler(store, runner, processHandlerId, processHandler))
-	err = errors.Join(err, registerHandler(store, runner, notifyHandlerId, notifyHandler))
-
+	err := errors.Join(
+		register(fetchHandlerId, fetchHandler("https://google.com")),
+		register(processHandlerId, processHandler),
+		register(notifyHandlerId, notifyHandler),
+	)
 	if err != nil {
 		slog.Error("fail to register handler", "err", err)
 		os.Exit(1)
@@ -121,19 +123,19 @@ func main() {
 	}
 }
 
-func registerHandler(
+func createRegistry(
 	store typedStore,
 	runner *pipes.Runner[typedStore],
-	handlerId int,
-	handler pipes.Handler[typedStore],
-) error {
-	if err := store.Register(handlerId); err != nil {
-		return err
-	}
+) func(int, pipes.Handler[typedStore]) error {
+	return func(handlerId int, handler pipes.Handler[typedStore]) error {
+		if err := store.Register(handlerId); err != nil {
+			return err
+		}
 
-	if err := runner.Register(handlerId, handler); err != nil {
-		return err
-	}
+		if err := runner.Register(handlerId, handler); err != nil {
+			return err
+		}
 
-	return nil
+		return nil
+	}
 }

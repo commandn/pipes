@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"errors"
-	"github.com/foobarbazmeow/pipes"
 	"log/slog"
 	"os"
 	"time"
+
+	"github.com/foobarbazmeow/pipes"
 )
 
 const (
@@ -30,12 +31,13 @@ func infiniteHandler(ctx context.Context, _ pipes.Store) (any, error) {
 func main() {
 	store := pipes.NewStore()
 	runner := pipes.NewRunner[pipes.Store]()
+	register := createRegistry(store, runner)
 
-	var err error
-	err = errors.Join(err, registerHandler(store, runner, infiniteHandler1Id, infiniteHandler, pipes.WithTimeout[pipes.Store](time.Second*1)))
-	err = errors.Join(err, registerHandler(store, runner, infiniteHandler2Id, infiniteHandler, pipes.WithTimeout[pipes.Store](time.Second*2)))
-	err = errors.Join(err, registerHandler(store, runner, infiniteHandler3Id, infiniteHandler, pipes.WithTimeout[pipes.Store](time.Second*3)))
-
+	err := errors.Join(
+		register(infiniteHandler1Id, infiniteHandler, pipes.WithTimeout[pipes.Store](time.Second*1)),
+		register(infiniteHandler2Id, infiniteHandler, pipes.WithTimeout[pipes.Store](time.Second*2)),
+		register(infiniteHandler3Id, infiniteHandler, pipes.WithTimeout[pipes.Store](time.Second*3)),
+	)
 	if err != nil {
 		slog.Error("fail to register handler", "err", err)
 		os.Exit(1)
@@ -57,20 +59,19 @@ func main() {
 	slog.Info("infiniteHandler3Id", "result", infiniteHandler3Result, "err", err)
 }
 
-func registerHandler(
+func createRegistry(
 	store pipes.Store,
 	runner *pipes.Runner[pipes.Store],
-	handlerId int,
-	handler pipes.Handler[pipes.Store],
-	opts ...pipes.Option[pipes.Store],
-) error {
-	if err := store.Register(handlerId); err != nil {
-		return err
-	}
+) func(int, pipes.Handler[pipes.Store], ...pipes.Option[pipes.Store]) error {
+	return func(handlerId int, handler pipes.Handler[pipes.Store], opts ...pipes.Option[pipes.Store]) error {
+		if err := store.Register(handlerId); err != nil {
+			return err
+		}
 
-	if err := runner.Register(handlerId, handler, opts...); err != nil {
-		return err
-	}
+		if err := runner.Register(handlerId, handler, opts...); err != nil {
+			return err
+		}
 
-	return nil
+		return nil
+	}
 }

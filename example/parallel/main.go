@@ -3,9 +3,10 @@ package main
 import (
 	"context"
 	"errors"
-	"github.com/foobarbazmeow/pipes"
 	"log/slog"
 	"os"
+
+	"github.com/foobarbazmeow/pipes"
 )
 
 const (
@@ -36,11 +37,12 @@ func squareHandler(n int) pipes.Handler[pipes.Store] {
 func main() {
 	store := pipes.NewStore()
 	runner := pipes.NewRunner[pipes.Store]()
+	register := createRegistry(store, runner)
 
-	var err error
-	err = errors.Join(err, registerHandler(store, runner, fibonacciHandlerId, fibonacciHandler(10)))
-	err = errors.Join(err, registerHandler(store, runner, squareHandlerId, squareHandler(10)))
-
+	err := errors.Join(
+		register(fibonacciHandlerId, fibonacciHandler(10)),
+		register(squareHandlerId, squareHandler(10)),
+	)
 	if err != nil {
 		slog.Error("fail to register handler", "err", err)
 		os.Exit(1)
@@ -59,19 +61,19 @@ func main() {
 	slog.Info("square handler", "result", squareResult, "err", err)
 }
 
-func registerHandler(
+func createRegistry(
 	store pipes.Store,
 	runner *pipes.Runner[pipes.Store],
-	handlerId int,
-	handler pipes.Handler[pipes.Store],
-) error {
-	if err := store.Register(handlerId); err != nil {
-		return err
-	}
+) func(int, pipes.Handler[pipes.Store]) error {
+	return func(handlerId int, handler pipes.Handler[pipes.Store]) error {
+		if err := store.Register(handlerId); err != nil {
+			return err
+		}
 
-	if err := runner.Register(handlerId, handler); err != nil {
-		return err
-	}
+		if err := runner.Register(handlerId, handler); err != nil {
+			return err
+		}
 
-	return nil
+		return nil
+	}
 }

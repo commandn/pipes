@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/foobarbazmeow/pipes"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
+
+	"github.com/foobarbazmeow/pipes"
 )
 
 const (
@@ -89,15 +90,16 @@ func notifyHandler(ctx context.Context, store pipes.Store) (any, error) {
 func main() {
 	store := pipes.NewStore()
 	runner := pipes.NewRunner[pipes.Store]()
+	register := createRegistry(store, runner)
 
-	var err error
-	err = errors.Join(err, registerHandler(store, runner, fetchGoogleHandlerId, fetchHandler("https://google.com")))
-	err = errors.Join(err, registerHandler(store, runner, fetchAmazonHandlerId, fetchHandler("https://amazon.com")))
-	err = errors.Join(err, registerHandler(store, runner, fetchOpenAIHandlerId, fetchHandler("https://openai.com")))
-	err = errors.Join(err, registerHandler(store, runner, processCloudHandlerId, processCloudHandler))
-	err = errors.Join(err, registerHandler(store, runner, processAIHandlerId, processAIHandler))
-	err = errors.Join(err, registerHandler(store, runner, notifyHandlerId, notifyHandler))
-
+	err := errors.Join(
+		register(fetchGoogleHandlerId, fetchHandler("https://google.com")),
+		register(fetchAmazonHandlerId, fetchHandler("https://amazon.com")),
+		register(fetchOpenAIHandlerId, fetchHandler("https://openai.com")),
+		register(processCloudHandlerId, processCloudHandler),
+		register(processAIHandlerId, processAIHandler),
+		register(notifyHandlerId, notifyHandler),
+	)
 	if err != nil {
 		slog.Error("fail to register handler", "err", err)
 		os.Exit(1)
@@ -109,21 +111,21 @@ func main() {
 	}
 }
 
-func registerHandler(
+func createRegistry(
 	store pipes.Store,
 	runner *pipes.Runner[pipes.Store],
-	handlerId int,
-	handler pipes.Handler[pipes.Store],
-) error {
-	if err := store.Register(handlerId); err != nil {
-		return err
-	}
+) func(int, pipes.Handler[pipes.Store]) error {
+	return func(handlerId int, handler pipes.Handler[pipes.Store]) error {
+		if err := store.Register(handlerId); err != nil {
+			return err
+		}
 
-	if err := runner.Register(handlerId, handler); err != nil {
-		return err
-	}
+		if err := runner.Register(handlerId, handler); err != nil {
+			return err
+		}
 
-	return nil
+		return nil
+	}
 }
 
 func read[R any](
