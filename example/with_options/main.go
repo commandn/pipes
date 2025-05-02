@@ -31,12 +31,12 @@ func infiniteHandler(ctx context.Context, _ pipes.Store) (any, error) {
 func main() {
 	store := pipes.NewStore()
 	runner := pipes.NewRunner[pipes.Store]()
-	register := createRegistry(store, runner)
+	registrator := pipes.NewRegistrator(store, runner)
 
 	err := errors.Join(
-		register(infiniteHandler1Id, infiniteHandler, pipes.WithTimeout[pipes.Store](time.Second*1)),
-		register(infiniteHandler2Id, infiniteHandler, pipes.WithTimeout[pipes.Store](time.Second*2)),
-		register(infiniteHandler3Id, infiniteHandler, pipes.WithTimeout[pipes.Store](time.Second*3)),
+		registrator(infiniteHandler1Id, infiniteHandler, pipes.WithTimeout[pipes.Store](time.Second*1)),
+		registrator(infiniteHandler2Id, infiniteHandler, pipes.WithTimeout[pipes.Store](time.Second*2)),
+		registrator(infiniteHandler3Id, infiniteHandler, pipes.WithTimeout[pipes.Store](time.Second*3)),
 	)
 	if err != nil {
 		slog.Error("fail to register handler", "err", err)
@@ -57,21 +57,4 @@ func main() {
 
 	infiniteHandler3Result, err := store.Read(ctx, infiniteHandler3Id)
 	slog.Info("infiniteHandler3Id", "result", infiniteHandler3Result, "err", err)
-}
-
-func createRegistry(
-	store pipes.Store,
-	runner *pipes.Runner[pipes.Store],
-) func(int, pipes.Handler[pipes.Store], ...pipes.Option[pipes.Store]) error {
-	return func(handlerId int, handler pipes.Handler[pipes.Store], opts ...pipes.Option[pipes.Store]) error {
-		if err := store.Register(handlerId); err != nil {
-			return err
-		}
-
-		if err := runner.Register(handlerId, handler, opts...); err != nil {
-			return err
-		}
-
-		return nil
-	}
 }

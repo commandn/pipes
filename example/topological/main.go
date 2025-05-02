@@ -90,15 +90,15 @@ func notifyHandler(ctx context.Context, store pipes.Store) (any, error) {
 func main() {
 	store := pipes.NewStore()
 	runner := pipes.NewRunner[pipes.Store]()
-	register := createRegistry(store, runner)
+	registrator := pipes.NewRegistrator(store, runner)
 
 	err := errors.Join(
-		register(fetchGoogleHandlerId, fetchHandler("https://google.com")),
-		register(fetchAmazonHandlerId, fetchHandler("https://amazon.com")),
-		register(fetchOpenAIHandlerId, fetchHandler("https://openai.com")),
-		register(processCloudHandlerId, processCloudHandler),
-		register(processAIHandlerId, processAIHandler),
-		register(notifyHandlerId, notifyHandler),
+		registrator(fetchGoogleHandlerId, fetchHandler("https://google.com")),
+		registrator(fetchAmazonHandlerId, fetchHandler("https://amazon.com")),
+		registrator(fetchOpenAIHandlerId, fetchHandler("https://openai.com")),
+		registrator(processCloudHandlerId, processCloudHandler),
+		registrator(processAIHandlerId, processAIHandler),
+		registrator(notifyHandlerId, notifyHandler),
 	)
 	if err != nil {
 		slog.Error("fail to register handler", "err", err)
@@ -108,23 +108,6 @@ func main() {
 	if err = runner.Run(context.Background(), store); err != nil {
 		slog.Error("fail to run pipeline", "err", err)
 		os.Exit(1)
-	}
-}
-
-func createRegistry(
-	store pipes.Store,
-	runner *pipes.Runner[pipes.Store],
-) func(int, pipes.Handler[pipes.Store]) error {
-	return func(handlerId int, handler pipes.Handler[pipes.Store]) error {
-		if err := store.Register(handlerId); err != nil {
-			return err
-		}
-
-		if err := runner.Register(handlerId, handler); err != nil {
-			return err
-		}
-
-		return nil
 	}
 }
 

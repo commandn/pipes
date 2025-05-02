@@ -105,12 +105,12 @@ func notifyHandler(ctx context.Context, store typedStore) (any, error) {
 func main() {
 	store := newStore(pipes.NewStore())
 	runner := pipes.NewRunner[typedStore]()
-	register := createRegistry(store, runner)
+	registrator := pipes.NewRegistrator(store, runner)
 
 	err := errors.Join(
-		register(fetchHandlerId, fetchHandler("https://google.com")),
-		register(processHandlerId, processHandler),
-		register(notifyHandlerId, notifyHandler),
+		registrator(fetchHandlerId, fetchHandler("https://google.com")),
+		registrator(processHandlerId, processHandler),
+		registrator(notifyHandlerId, notifyHandler),
 	)
 	if err != nil {
 		slog.Error("fail to register handler", "err", err)
@@ -120,22 +120,5 @@ func main() {
 	if err = runner.Run(context.Background(), store); err != nil {
 		slog.Error("fail to run pipeline", "err", err)
 		os.Exit(1)
-	}
-}
-
-func createRegistry(
-	store typedStore,
-	runner *pipes.Runner[typedStore],
-) func(int, pipes.Handler[typedStore]) error {
-	return func(handlerId int, handler pipes.Handler[typedStore]) error {
-		if err := store.Register(handlerId); err != nil {
-			return err
-		}
-
-		if err := runner.Register(handlerId, handler); err != nil {
-			return err
-		}
-
-		return nil
 	}
 }

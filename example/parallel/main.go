@@ -37,11 +37,11 @@ func squareHandler(n int) pipes.Handler[pipes.Store] {
 func main() {
 	store := pipes.NewStore()
 	runner := pipes.NewRunner[pipes.Store]()
-	register := createRegistry(store, runner)
+	registrator := pipes.NewRegistrator(store, runner)
 
 	err := errors.Join(
-		register(fibonacciHandlerId, fibonacciHandler(10)),
-		register(squareHandlerId, squareHandler(10)),
+		registrator(fibonacciHandlerId, fibonacciHandler(10)),
+		registrator(squareHandlerId, squareHandler(10)),
 	)
 	if err != nil {
 		slog.Error("fail to register handler", "err", err)
@@ -59,21 +59,4 @@ func main() {
 
 	squareResult, err := store.Read(ctx, squareHandlerId)
 	slog.Info("square handler", "result", squareResult, "err", err)
-}
-
-func createRegistry(
-	store pipes.Store,
-	runner *pipes.Runner[pipes.Store],
-) func(int, pipes.Handler[pipes.Store]) error {
-	return func(handlerId int, handler pipes.Handler[pipes.Store]) error {
-		if err := store.Register(handlerId); err != nil {
-			return err
-		}
-
-		if err := runner.Register(handlerId, handler); err != nil {
-			return err
-		}
-
-		return nil
-	}
 }
