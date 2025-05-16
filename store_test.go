@@ -64,3 +64,41 @@ func Test_Store_Read(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 42, data)
 }
+
+func Test_Read(t *testing.T) {
+	t.Parallel()
+
+	s := NewStore()
+	ctx := context.Background()
+
+	err := s.Register(1)
+	require.NoError(t, err)
+
+	err = s.Write(1, 1, nil)
+	require.NoError(t, err)
+
+	_, err = Read[string](ctx, s, 1)
+	require.ErrorContains(t, err, "invalid type")
+
+	result, err := Read[int](ctx, s, 1)
+	require.NoError(t, err)
+	require.Equal(t, 1, result)
+}
+
+func Test_Read_FailToRead(t *testing.T) {
+	t.Parallel()
+
+	s := NewStore()
+	ctx, cancelFn := context.WithCancel(context.Background())
+
+	err := s.Register(1)
+	require.NoError(t, err)
+
+	err = s.Write(1, 1, nil)
+	require.NoError(t, err)
+
+	cancelFn()
+
+	_, err = Read[int](ctx, s, 1)
+	require.ErrorIs(t, err, context.Canceled)
+}

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -33,31 +32,11 @@ func newStore(s pipes.Store) typedStore {
 }
 
 func (s *store) GetFetchHandlerResult(ctx context.Context) (string, error) {
-	data, err := s.Read(ctx, fetchHandlerId)
-	if err != nil {
-		return "", err
-	}
-
-	content, ok := data.(string)
-	if !ok {
-		return "", fmt.Errorf("fetch handler data is not a string: %T", data)
-	}
-
-	return content, nil
+	return pipes.Read[string](ctx, s, fetchHandlerId)
 }
 
 func (s *store) GetProcessHandlerResult(ctx context.Context) (map[rune]struct{}, error) {
-	data, err := s.Read(ctx, processHandlerId)
-	if err != nil {
-		return nil, err
-	}
-
-	alphabet, ok := data.(map[rune]struct{})
-	if !ok {
-		return nil, fmt.Errorf("process handler data is not a string: %T", data)
-	}
-
-	return alphabet, nil
+	return pipes.Read[map[rune]struct{}](ctx, s, processHandlerId)
 }
 
 func fetchHandler(url string) pipes.Handler[typedStore] {

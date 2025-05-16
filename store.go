@@ -3,6 +3,7 @@ package pipes
 import (
 	"context"
 	"errors"
+	"fmt"
 )
 
 type Store interface {
@@ -46,4 +47,18 @@ func (s *store) Write(id int, data any, err error) error {
 		return nil
 	}
 	return ErrStateNotRegistered
+}
+
+func Read[T any](ctx context.Context, s Store, handlerId int) (T, error) {
+	untyped, err := s.Read(ctx, handlerId)
+	if err != nil {
+		return *new(T), err
+	}
+
+	result, ok := untyped.(T)
+	if !ok {
+		return *new(T), fmt.Errorf("invalid type %T for data from handler %d", untyped, handlerId)
+	}
+
+	return result, nil
 }

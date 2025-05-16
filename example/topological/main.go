@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -39,12 +38,12 @@ func fetchHandler(url string) pipes.Handler[pipes.Store] {
 }
 
 func processCloudHandler(ctx context.Context, store pipes.Store) (any, error) {
-	googleContent, err := read[string](ctx, store, fetchGoogleHandlerId)
+	googleContent, err := pipes.Read[string](ctx, store, fetchGoogleHandlerId)
 	if err != nil {
 		return nil, err
 	}
 
-	amazonContent, err := read[string](ctx, store, fetchAmazonHandlerId)
+	amazonContent, err := pipes.Read[string](ctx, store, fetchAmazonHandlerId)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +57,7 @@ func processCloudHandler(ctx context.Context, store pipes.Store) (any, error) {
 }
 
 func processAIHandler(ctx context.Context, store pipes.Store) (any, error) {
-	openAIContent, err := read[string](ctx, store, fetchOpenAIHandlerId)
+	openAIContent, err := pipes.Read[string](ctx, store, fetchOpenAIHandlerId)
 	if err != nil {
 		return nil, err
 	}
@@ -72,12 +71,12 @@ func processAIHandler(ctx context.Context, store pipes.Store) (any, error) {
 }
 
 func notifyHandler(ctx context.Context, store pipes.Store) (any, error) {
-	cloudAlphabet, err := read[map[rune]struct{}](ctx, store, processCloudHandlerId)
+	cloudAlphabet, err := pipes.Read[map[rune]struct{}](ctx, store, processCloudHandlerId)
 	if err != nil {
 		return nil, err
 	}
 
-	aiAlphabet, err := read[map[rune]struct{}](ctx, store, processAIHandlerId)
+	aiAlphabet, err := pipes.Read[map[rune]struct{}](ctx, store, processAIHandlerId)
 	if err != nil {
 		return nil, err
 	}
@@ -109,22 +108,4 @@ func main() {
 		slog.Error("fail to run pipeline", "err", err)
 		os.Exit(1)
 	}
-}
-
-func read[R any](
-	ctx context.Context,
-	store pipes.Store,
-	handlerId int,
-) (R, error) {
-	data, err := store.Read(ctx, handlerId)
-	if err != nil {
-		return *new(R), err
-	}
-
-	result, ok := data.(R)
-	if !ok {
-		return *new(R), fmt.Errorf("invalid type of content in handler store: %T", data)
-	}
-
-	return result, nil
 }
