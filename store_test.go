@@ -94,9 +94,6 @@ func Test_Read_FailToRead(t *testing.T) {
 	err := s.Register(1)
 	require.NoError(t, err)
 
-	err = s.Write(1, 1, nil)
-	require.NoError(t, err)
-
 	cancelFn()
 
 	_, err = Read[int](ctx, s, 1)
