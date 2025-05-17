@@ -57,7 +57,7 @@ func Read[T any](ctx context.Context, s Store, handlerId int) (T, error) {
 
 	result, ok := untyped.(T)
 	if !ok {
-		return *new(T), fmt.Errorf("invalid type %T for data from handler %d", untyped, handlerId)
+		return *new(T), fmt.Errorf("invalid type %T for data from handler %d", *new(T), handlerId)
 	}
 
 	return result, nil
