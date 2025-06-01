@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func Test_Runner_Register(t *testing.T) {
@@ -417,4 +418,17 @@ func Test_wrap(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, []int{3, 2, 1, 0}, result)
+}
+
+func Test_Runner_Run_MultipleCalls(t *testing.T) {
+	t.Parallel()
+
+	s := NewStore()
+	r := NewRunner[Store]()
+
+	err := r.Run(context.Background(), s)
+	require.NoError(t, err)
+
+	err = r.Run(context.Background(), s)
+	require.ErrorIs(t, err, ErrRunnerHasBeenLaunchedBefore)
 }

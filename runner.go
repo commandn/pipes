@@ -4,24 +4,28 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"golang.org/x/sync/errgroup"
 	"maps"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
-var ErrHandlerAlreadyRegistered = errors.New("handler already registered")
+var (
+	ErrHandlerAlreadyRegistered    = errors.New("handler already registered")
+	ErrRunnerHasBeenLaunchedBefore = errors.New("runner has been launched before")
+)
 
 type Handler[S Store] func(context.Context, S) (any, error)
 
-// Generic runner
-// It would be much more cleaner to implement typed runner without generics
 type Runner[S Store] struct {
 	handlers map[int]Handler[S]
 
 	statistics   map[int]time.Duration
 	statisticsMu sync.Mutex
+
+	done atomic.Bool
 }
 
 func NewRunner[S Store]() *Runner[S] {
@@ -40,6 +44,10 @@ func (r *Runner[S]) Register(id int, h Handler[S], opts ...Option[S]) error {
 }
 
 func (r *Runner[S]) Run(ctx context.Context, s S) error {
+	if !r.done.CompareAndSwap(false, true) {
+		return ErrRunnerHasBeenLaunchedBefore
+	}
+
 	eg := errgroup.Group{}
 	ctx, cancelFn := context.WithCancelCause(ctx)
 	defer cancelFn(nil)
@@ -57,8 +65,6 @@ func (r *Runner[S]) Run(ctx context.Context, s S) error {
 			defer func() {
 				if recErr := recover(); recErr != nil {
 					err = errors.Join(err, fmt.Errorf("panic recover: %v", recErr))
-					// TODO: What if r.s.Write() panics again?
-					// TODO: We must write state to unblock dependant consumers
 					wErr := s.Write(id, nil, err)
 					err = errors.Join(err, wErr)
 				}
