@@ -51,7 +51,7 @@ func (s *store) Write(id int, data any, err error) error {
 
 func Read[T any](ctx context.Context, s Store, handlerId int) (T, error) {
 	untyped, err := s.Read(ctx, handlerId)
-	if err != nil {
+	if untyped == nil {
 		return *new(T), err
 	}
 
@@ -60,5 +60,5 @@ func Read[T any](ctx context.Context, s Store, handlerId int) (T, error) {
 		return *new(T), fmt.Errorf("invalid type %T for data from handler %d", *new(T), handlerId)
 	}
 
-	return result, nil
+	return result, err
 }

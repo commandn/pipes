@@ -2,8 +2,9 @@ package pipes
 
 import (
 	"context"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func Test_Store_Register(t *testing.T) {
@@ -69,20 +70,21 @@ func Test_Read(t *testing.T) {
 	t.Parallel()
 
 	s := NewStore()
-	ctx := context.Background()
+	require.NoError(t, s.Register(1))
+	require.NoError(t, s.Register(2))
+	require.NoError(t, s.Write(1, 42, nil))
+	require.NoError(t, s.Write(2, nil, context.Canceled))
 
-	err := s.Register(1)
-	require.NoError(t, err)
-
-	err = s.Write(1, 1, nil)
-	require.NoError(t, err)
-
-	_, err = Read[string](ctx, s, 1)
+	_, err := Read[string](context.Background(), s, 1)
 	require.ErrorContains(t, err, "invalid type")
 
-	result, err := Read[int](ctx, s, 1)
+	result1, err := Read[int](context.Background(), s, 1)
 	require.NoError(t, err)
-	require.Equal(t, 1, result)
+	require.Equal(t, 42, result1)
+
+	result2, err := Read[any](context.Background(), s, 2)
+	require.Nil(t, result2)
+	require.ErrorIs(t, err, context.Canceled)
 }
 
 func Test_Read_FailToRead(t *testing.T) {
